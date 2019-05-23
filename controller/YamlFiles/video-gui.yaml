@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: video-gui
+spec:
+  nodeName: kworker1.dragon.com # schedule pod to specific node
+  containers:
+  - name: my-first-pod
+    image: andreamora/imagerepo:vlcnoentrypointwithplugins
+    env:
+    - name: DISPLAY
+      value: :0
+    stdin: true
+    tty: true
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - mountPath: /tmp/.X11-unix
+      name: video
+    - mountPath: /home/Video
+      name: storagevideo
+    command: ["/bin/sh","-c"]
+    args: ["vlc -V x11 http://10.244.2.10:8080 --no-qt-privacy-ask --no-metadata-network-access --snapshot-path=/home/vlc/snapshots --network-caching=1000"]
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "256m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m" #=0.5cpu
+  restartPolicy: OnFailure
+  volumes:
+  - name: video
+    hostPath:
+      path: /tmp/.X11-unix    # directory location on host
+  - name: storagevideo
+    hostPath:
+      path: /home/vagrant/Desktop/Video

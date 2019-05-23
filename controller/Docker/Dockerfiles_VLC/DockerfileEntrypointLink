@@ -1,0 +1,24 @@
+FROM debian
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		libgl1-mesa-dri \
+		libgl1-mesa-glx \
+		pulseaudio \
+		alsa-utils \
+		dbus* \
+		vlc && \
+	apt-get -y -f install && \
+	useradd -m vlc && \
+	usermod -a -G audio,video vlc && \
+	rm -rf /var/lib/apt/lists/*
+	 
+USER vlc
+
+WORKDIR /home/vlc/media
+
+#link to files
+ENTRYPOINT ["vlc","http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_30fps_normal.mp4", "--no-qt-privacy-ask", "--no-metadata-network-access", "--snapshot-path=/home/vlc/snapshots"]

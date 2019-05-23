@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+  #  - name: test-container#
+  #    image: k8s.gcr.io/busybox:1.24
+  #    command: [ "sh", "-c"]
+  #    args:
+  #      - while true; do
+  #          echo -en '\n';
+  #          printenv MY_MEM_REQUEST;
+  #          printenv MESSAGE;
+  #          sleep 10;
+  #        done;
+  #    resources:
+  #      requests:
+  #        memory: "10Mi"
+  #        cpu: "125m"
+  #      limits:
+  #        memory: "64Mi"
+  #        cpu: "250m"
+  #    env:
+  #      - name: MESSAGE
+  #        value: Message = Sono il container #!!
+  #      - name: MY_MEM_REQUEST
+  #        valueFrom:
+  #          resourceFieldRef:
+  #            containerName: test-container#
+  #            resource: requests.memory
+  restartPolicy: Never

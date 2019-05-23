@@ -1,0 +1,22 @@
+
+
+To execute a command in Container:
+    docker exec -it "containerId o name" /bin/bash      --> enter in docker bash
+
+
+To execute a command in this Pod:
+    kubectl exec -it "podName" -n "namespaceName" /bin/bash
+
+
+kubectl apply -f file.yaml -n test          carico file yamp in namespace test
+
+
+kubectl get pods -n namespace
+kubectl get pods -o wide -n namespace       si vedono anche ip e nodo
+
+kubectl get nodes
+kubectl delete pods Namepod -n namenspace
+
+kubectl describe nodes kworker1.dragon.com      info di un nodo
+
+kubectl describe nodes      info all node

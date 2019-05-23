@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-kubernetes-message
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-kubernetes-message
+  template:
+    metadata:
+      labels:
+        app: hello-kubernetes-message
+    spec:
+      nodeName: kworker1.dragon.com
+      containers:
+      - name: hello-kubernetes
+        image: paulbouwer/hello-kubernetes:1.5
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MESSAGE
+          value: This is my Message!!
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 128Mi

@@ -1,0 +1,18 @@
+
+sudo docker build -t vlc . 
+
+sudo docker run -ti --rm  -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix vlc
+sudo docker run -ti --rm  -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix "IMAGE ID"
+
+
+
+
+sudo docker exec -it Container-name bash        apre la bash del docker
+
+docker exec -u 0 -it mycontainer bash
+
+
+
+sudo docker commit da92786e9d87 andreamora/imagerepo:vlcnoentrypoint            commit container
+
+sudo docker push andreamora/imagerepo:vlcnoentrypoint                           push image

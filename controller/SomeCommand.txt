@@ -1,0 +1,28 @@
+Stream in HTTP:
+
+    on the server, run:
+
+% vlc -vvv input_stream --sout '#standard{access=http,mux=ogg,dst=server.example.org:8080}'
+
+    on the client(s), run:
+
+% vlc http://server.example.org:8080
+
+
+Stream with RTSP and RTP:
+
+    Run on the server:
+
+% vlc -vvv input_stream --sout '#rtp{dst=192.168.0.12,port=1234,sdp=rtsp://server.example.org:8080/test.sdp}'
+
+    Run on the client(s):
+
+% vlc rtsp://server.example.org:8080/test.sdp
+
+
+
+server:
+cvlc -I dummy -vvv /home/Video/video1080.mp4 --sout '#transcode{vcodec=h264,vb=1500,width=1280,height=720,acodec=mp3,ab=192,channels=2,samplerate=44100,scodec=none}:http{mux=ffmpeg{mux=flv},dst=:8080/}' --no-sout-all --sout-keep
+
+client:
+vlc -V x11 http://ipserv:8080 --no-qt-privacy-ask --no-metadata-network-access --snapshot-path=/home/vlc/snapshots

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: video-streamer
+spec:
+  nodeName: kworker2.dragon.com # schedule pod to specific node
+  containers:
+  - name: my-first-pod
+    image: andreamora/imagerepo:vlcnoentrypoint
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - mountPath: /home/Video
+      name: storagevideo
+    command: ["/bin/sh","-c"]
+    #cvlc -I dummy -vvv /home/Video/videoNoSound.mp4 --sout '#transcode{vcodec=h264,vb=1500,fps=35,width=640,height=360,acodec=mp3,ab=192,channels=2,samplerate=44100,scodec=none}:http{mux=ffmpeg{mux=flv},dst=:8080/}' --no-sout-all --sout-keep
+    args: ["cvlc -vvv /home/Video/videoNoSound.mp4 --sout '#transcode{vcodec=h264,vb=1500,fps=35,width=640,height=360,acodec=mp3,ab=192,channels=2,samplerate=44100,scodec=none}:http{mux=ffmpeg{mux=flv},dst=:8080/}' --no-sout-all --sout-keep"] #["cvlc -I dummy -vvv /home/Video/video1080.mp4 --sout '#standard{access=http,dst=:8080}' --no-sout-all --sout-keep"]
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1024Mi"
+        cpu: "1"
+  restartPolicy: OnFailure
+  volumes:
+  - name: storagevideo
+    hostPath:
+      path: /home/vagrant/Desktop/Video   # directory location on host

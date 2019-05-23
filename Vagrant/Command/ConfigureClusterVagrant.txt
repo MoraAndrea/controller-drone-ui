@@ -1,0 +1,82 @@
+Come configuare un Cluster con Vagrant
+
+nella cartella vagrant-provisioning ci sono i file necessari per il deploy
+
+modificare i file per modificare la struttura che si vuole
+
+SETUP
+Step:
+
+Provisioning Cluster:
+1) vagrant up						per avviare 
+2) vagrant status					per vedere se è andato a buon fine
+3) vagrant ssh kmaster				si collega in ssh alla vm "kmaster"
+	3.0) kubectl version
+		 kubectl version --short	versione di kubectl
+	3.1) kubectl get nodes			si controlla che i nodi siano tutti conosciuti
+	3.2) kubectl get nodes -o wide	si vedono anche altre cose come l'IP
+	3.3) kubectl cluster-info		info sul cluster (master, dns, ecc)
+	3.4) exit o logout				per uscire da ssh
+
+Manage from Host:
+Per poter accedere ad esempio a kubectl senza dover accedere al master ecc.... usare kubectl direttamente dall'host
+4) sudo nano /etc/hosts
+	4.1) aggiungere alla fine gli ip e i nomi dei nodi. come fa anche bootstrap.sh sui nodi (devono essere uguali)
+			ad esempio: 192.0.0.100 kmaster.dragon.com kmaster
+						192.0.0.101 kworker1.dragon.com kworker1
+
+5) cd								spostarsi nella home
+6) mkdir .kube						creare la cartella .kube
+7) scp vagrant@kmaster.dragon.com:.kube/config .kube/	copia il file di configurazione dal kmaster nella cartella creata
+	oppure  scp vagrant@kmaster.dragon.com:.kube/admin.conf ~/.kube/
+			mv ~/.kube/admin.conf ~/.kube/config
+	password: vagrant
+8) installare kubectl binary
+	8.1) curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.14.0/bin/linux/amd64/kubectl 	[version v1.14.0 on Linux]
+	8.2) chmod +x ./kubectl								rende kubectl binary eseguibile
+	8.3) sudo mv ./kubectl /usr/local/bin/kubectl		muove il binario nel PATH
+
+9) which kubectl					per vedere dove sta kubectl
+
+
+
+PER DASHBOARD
+
+dopo tutto quello precedente
+1) spostarsi nella cartella dashboard
+2) kubectl -n kube-system get pods -o wide
+3) kubectl create -f influxdb.yaml						db for metric in dashboard
+4) kubectl create -f heapster.yaml
+5) kubectl create -f dashboard.yaml						per la dashboard
+		dentro c'è scritto la porta da usare
+
+per guardare in che nodo è stata deployata la dashboard:
+6) kubectl -n kube-system get pods -o wide		
+
+7) dal browser digitare ad esempio: https://kmaster:32323
+		si apre il login
+8) kubectl create -f sa_cluster_admin.yaml				crea binding per la dasboard
+9) kubectl describe sa dashboard-admin -n kube-system	da info dashboard
+	copiare il campo moutable secrets (es: dasboard-admin-token-xxxxx)
+10)kubectl describe secret "dasboard-admin-token-xxxxx" -n kube-system
+		copiare in Token: ............
+11) dal browser nella pagina di login selezionare token e usare quello appena copiato
+
+
+
+PER SNAPSHOT
+
+1) vagrant halt								per spegnere le vm
+2) vagrant help snapshot					help for snapshot
+3) vagrant snapshot list 					lista snapshot esistenti
+    vagrant snapshot list kmaster			lista snapshot solo per kmaster
+4) vagrant snapshot save "name"				salva uno snapshot per ogni vm
+   vagrant snapshot save kmaster "name"		snapshot solo per kmaster
+5) vagrant snapshot restore "name"			restore uno snapshot
+
+
+
+COMANDI UTILI
+
+vagrant suspend
+vagrant resume

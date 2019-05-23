@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-video1
+spec:
+  nodeName: kworker2.dragon.com # schedule pod to specific node
+  containers:
+  - name: my-first-pod
+    image: andreamora/imagerepo:install
+    env:
+    - name: DISPLAY
+      value: :0
+    stdin: true
+    tty: true
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - mountPath: /tmp/.X11-unix
+      name: video
+  volumes:
+  - name: video
+    hostPath:
+      # directory location on host
+      path: /tmp/.X11-unix

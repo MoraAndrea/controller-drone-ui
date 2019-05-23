@@ -1,0 +1,17 @@
+{
+  "ID": "VLC",
+  "components": [
+    {
+      "name": "video-gui",
+      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+      "winner": "dragon",
+      "priority": 2
+    },
+    {
+      "name": "video-streamer",
+      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+      "winner": "video-streamer",
+      "priority": 1
+    }
+  ]
+}

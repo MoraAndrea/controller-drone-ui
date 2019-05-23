@@ -1,0 +1,9 @@
+Comandi per configurare "kubectl" sui nodi in cui si vuole usare:
+copio la conf che c'è sul master
+
+cd      --> mi spodto nella home
+mkdir .kube  --> creao cartella per la conf
+scp vagrant@kmaster.dragon.com:.kube/config .kube/	--> copia il file di configurazione dal kmaster nella cartella creata
+        oppure  scp vagrant@kmaster.dragon.com:.kube/admin.conf ~/.kube/
+			mv ~/.kube/admin.conf ~/.kube/config
+	    password: vagrant

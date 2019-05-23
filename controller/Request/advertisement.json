@@ -1,0 +1,33 @@
+{
+  "ID": "VLC",
+  "owner": "node1",
+  "type": "add",
+  "components": [
+    {
+      "name": "video-gui",
+      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+      "resources": {
+        "memory": 256,
+        "cpu": 0.5
+      },
+      "priority": 2,
+      "blacklist": [
+        "node2"
+      ],
+      "parameter": null
+    },
+    {
+      "name": "video-streamer",
+      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+      "resources": {
+        "memory": 1024,
+        "cpu": 2
+      },
+      "priority": 1,
+      "blacklist": [
+        "node2"
+      ],
+      "parameter": "videoPath"
+    }
+  ]
+}

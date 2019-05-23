@@ -1,33 +1,43 @@
 {
-  "ID": "VLC",
-  "owner": "node1",
+  "app_name": "VLC-AAAAAA",
+  "base_node": "node1",
   "type": "add",
   "components": [
     {
       "name": "video-gui",
-      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
-      "resources": {
-        "memory": 256,
-        "cpu": 0.5
+      "function": {
+        "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+        "resources": {
+          "memory": 256,
+          "cpu": 0.5
+        }
       },
-      "priority": 2,
-      "blacklist": [
+      "parameter": null,
+      "boot_dependencies": [],
+      "nodes_blacklist": [
         "node2"
       ],
-      "parameter": null
+      "nodes_whitelist": [
+        "node2"
+      ]
     },
     {
       "name": "video-streamer",
-      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
-      "resources": {
-        "memory": 1024,
-        "cpu": 2
+      "function": {
+        "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+        "resources": {
+          "memory": 1024,
+          "cpu": 2
+        }
       },
-      "priority": 1,
-      "blacklist": [
+      "parameter": null,
+      "boot_dependencies": [],
+      "nodes_blacklist": [
         "node2"
       ],
-      "parameter": "videoPath"
+      "nodes_whitelist": [
+        "node2"
+      ]
     }
   ]
 }

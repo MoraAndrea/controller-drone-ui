@@ -42,5 +42,8 @@ class Configuration(object, metaclass=Singleton):
             self.QUEUE_ADV = config.get('federation', 'queue_adv')
             self.QUEUE_RESULT = config.get('federation', 'queue_result')
 
+            # [rabbit]
+            self.QUEUE_USER_REQ = config.get('rabbit', 'queue_user_req')
+
         except Exception as ex:
             raise Exception(str(ex))

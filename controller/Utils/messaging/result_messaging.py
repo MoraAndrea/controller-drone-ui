@@ -16,11 +16,18 @@ class Messaging_result(object, metaclass=singleton.Singleton):
         self.configuration = Configuration("config/config.ini")
         self.output_queue = queue   # queue for read result message
 
-    def register_handler_result(self,connection_id, topic, handler, exchange_name):
+    def register_handler_result(self,connection_id, topic, handler, exchange_name,local=False):
         if connection_id not in self._messaging._channels:
             print(connection_id+" not found")
+
+        if local:
+            exchange = ''
+        else:
+            exchange = self.configuration.EXCHANGE
+
         self._messaging._channels[connection_id].queue_declare(queue=topic)
-        self._messaging._channels[connection_id].queue_bind(exchange=exchange_name, queue=topic)
+        if exchange != '':
+            self._messaging._channels[connection_id].queue_bind(exchange=exchange_name, queue=topic)
         if handler is None:
             handler = self._result_message_handler
         self._message_handler = handler

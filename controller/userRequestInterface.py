@@ -7,7 +7,6 @@ from tkinter.filedialog import askopenfile, askdirectory
 from controller.UserGuiResources.logger import ConsoleUiLogger, App
 from controller.Utils.messaging.CommunicationDockerKubernetes.KubernetesManagerClass import KubernetesClass
 from controller.config.config import Configuration
-from controller.messaging_UI_controller import send_add_message_to_rabbit_or_runALL, send_del_message_to_rabbit
 
 
 class Application(Frame):

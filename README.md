@@ -1,2 +1,0 @@
-# DemoDrone
-Demo per Tesi

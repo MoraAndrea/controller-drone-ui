@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import uuid
 from os import path
 
 import psutil
@@ -8,14 +9,17 @@ import psutil
 from controller.Utils import vlc_yamlManager
 from controller.Utils.messaging.ClassForMessageADV.advertisement_message import AdvMessage
 from controller.Utils.messaging.ClassForMessageADV.appComponent import Component
+from controller.Utils.messaging.ClassForMessageADV.componentFunction import Function
 from controller.Utils.messaging.ClassForMessageADV.componentResource import Resource
 from controller.Utils.messaging.CommunicationDockerKubernetes.KubernetesManagerClass import KubernetesClass
 from controller.Utils.messaging.adv_messaging import Messaging_adv
 from controller.config.config import Configuration
 
+APP_RUNNING=dict()
+
 def send_request_app(classLogger, fileRequest, app, parameter, path=None):
     logger = classLogger.getLogger()
-    messaging_adv=Messaging_adv("localhost")
+    messaging_adv = Messaging_adv("localhost")
     if fileRequest is not None:
         if (check_possibility(fileRequest=fileRequest.name) is True):
             # this node can run the entire application
@@ -31,11 +35,15 @@ def send_request_app(classLogger, fileRequest, app, parameter, path=None):
             # this node cannot run the entire application so send request
             print("Send request for application describe in file: " + fileRequest.name)
             logger.submit_message('INFO', "Send request for application describe in file: " + fileRequest.name)
-            messaging_adv.send_from_file_adv(fileRequest.name,local=True)  # send message to controller
+
+            request_message = AdvMessage()
+            request_message.from_json(fileRequest.name)
+            messaging_adv.send_user_req(request_message, local=True)  # send message to controller
+            APP_RUNNING[request_message.app_name]=request_message
             return True
     else:
         if app and parameter is not None:
-            message = create_request(app,"add", parameter, socket.gethostname(), path)
+            message = create_request(app, "add", parameter, socket.gethostname(), path)
             if (check_possibility(messageReq=message) is True):
                 # this node can run the entire application
                 # TODO: vedere come farlo
@@ -49,26 +57,37 @@ def send_request_app(classLogger, fileRequest, app, parameter, path=None):
                 pass
             else:
                 # this node cannot run the entire application so send request
-                logger.submit_message('INFO', "Send request for application: " + message.ID)
-                print("Send request for application: " + message.ID)
-                messaging_adv.send_adv(message,local=True)   # send message to controller
+                print("Send request for application: " + message.app_name)
+                logger.submit_message('INFO', "Send request for application: " + message.app_name)
+
+                messaging_adv.send_user_req(message, local=True)  # send message to controller
+                APP_RUNNING[message.app_name] = message
                 return True
         else:
             return None
 
-def send_del_message_to_rabbit(classA, fileRequest, app, parameter):
-    logger = classA.getLogger()
-    messaging_adv=Messaging_adv("localhost")
+# pass filename of file or App_ID of deploy app
+def send_delete_app(classLogger, fileRequest=None, app_id=None):
+    logger = classLogger.getLogger()
+    messaging_adv = Messaging_adv("localhost")
     if fileRequest is not None:
-        message = AdvMessage()
-        message.from_json(fileRequest.name)
-        message_del = create_request(app,'del', parameter, socket.gethostname(), path)
-        messaging_adv.send_adv(message_del)
+        message_del = AdvMessage()
+        message_del.from_json(fileRequest.name)
+        message_del.type='del'
+        messaging_adv.send_user_req(message_del, local=True) # send message to controller
+        try:
+            APP_RUNNING.pop(message_del.app_name)  # remove app running
+        except KeyError:
+            print("Key not found")
         logger.submit_message('INFO', "Send request for delete application describe in file: " + fileRequest.name)
     else:
-        message = create_request(app,'del', parameter, socket.gethostname(), path)
-        messaging_adv.send_adv(message)
-        logger.submit_message('INFO', "Send request for delete application: " + message.ID)
+        app_del=APP_RUNNING[app_id]
+        messaging_adv.send_user_req(app_del, local=True) # send message to controller
+        try:
+            APP_RUNNING.pop(app_del.app_name) # remove app running
+        except KeyError:
+            print("Key not found")
+        logger.submit_message('INFO', "Send request for delete application: " + app_del.app_name)
 
 
 def runKubeImpl_local(message):
@@ -86,12 +105,14 @@ def runKubeImpl_local(message):
 
     # TODO: fare in modo che cambia il file video nello yaml leggendo in fileRequest
 
-    fileNameMod=vlc_yamlManager.modified_localVideo(path.join(path.dirname(__file__), configuration.YAML_FOLDER + "video-gui-local-video.yaml"), message.components[1]['parameter'])
+    fileNameMod = vlc_yamlManager.modified_localVideo(
+        path.join(path.dirname(__file__), configuration.YAML_FOLDER + "video-gui-local-video.yaml"),
+        message.components[1]['parameter'])
 
     # local run pod
-    #podNameVideoLocal = kubernetes.create_pod(path.join(path.dirname(__file__), configuration.YAML_FOLDER + "video-gui-local-video.yaml"),configuration.NAMESPACE)
+    # podNameVideoLocal = kubernetes.create_pod(path.join(path.dirname(__file__), configuration.YAML_FOLDER + "video-gui-local-video.yaml"),configuration.NAMESPACE)
 
-    podNameVideoLocal = kubernetes.create_pod(path.join(path.dirname(__file__), fileNameMod),configuration.NAMESPACE)
+    podNameVideoLocal = kubernetes.create_pod(path.join(path.dirname(__file__), fileNameMod), configuration.NAMESPACE)
     return podNameVideoLocal
 
 
@@ -121,22 +142,27 @@ def check_possibility(fileRequest=None, messageReq=None):
     else:
         return False
 
-def create_json_with_request(app,type, parameters, hostname, path):
-    id = app
-    type =type
-    if id == 'VLC':
-        owner = hostname
+
+def create_json_with_request(app, type, parameters, hostname, path):
+    app_name = app + uuid.uuid4().hex[:6].upper()
+    type = type
+    if app == 'VLC':
+        base_node = hostname
         components = []
-        componentGUI = Component(name="video-gui", image="andreamora/imagerepo:vlcnoentrypointwithplugins",
-                                 priority="2", resources=Resource(memory=256, cpu=0.5).to_dict(),
-                                 blacklist=["node2"], parameter=None)
+
+        func = Function(image="andreamora/imagerepo:vlcnoentrypointwithplugins",
+                        resources=Resource(memory=256, cpu=0.5).to_dict())
+
+        componentGUI = Component(name="video-gui", function=func.to_dict(),
+                                 boot_dependencies=["2"], nodes_blacklist=["node2"], nodes_whitelist=["node2"],
+                                 parameter=None)
         components.append(componentGUI.to_dict())
-        componentStream = Component(name="video-streamer", image="andreamora/imagerepo:vlcnoentrypointwithplugins",
-                                    priority="1", resources=Resource(memory=1024, cpu=2).to_dict(),
-                                    blacklist=["node2"], parameter=path)
+        componentStream = Component(name="video-streamer", function=func.to_dict(),
+                                    boot_dependencies=["2"], nodes_blacklist=["node2"], nodes_whitelist=["node2"],
+                                    parameter=path)
         components.append(componentStream.to_dict())
 
-        message = AdvMessage(ID=id, owner=owner, components=components, type=type)
+        message = AdvMessage(app_name=app_name, base_node=base_node, components=components, type=type)
         with open('message_ADV.json', 'w') as fp:
             json.dump(message.to_dict(), fp, indent=4)
 
@@ -145,23 +171,26 @@ def create_json_with_request(app,type, parameters, hostname, path):
         return "not implemented"
 
 
-def create_request(app,type, parameters, hostname, path):
-    id = app
-    type =type
-    if id == 'VLC':
-        owner = hostname
+def create_request(app, type, parameters, hostname, path):
+    app_name = app + uuid.uuid4().hex[:6].upper()
+    type = type
+    if app == 'VLC':
+        base_node = hostname
         components = []
-        componentGUI = Component(name="video-gui", image="andreamora/imagerepo:vlcnoentrypointwithplugins",
-                                 priority="2", resources=Resource(memory=256, cpu=0.5).to_dict(),
-                                 blacklist=["node2"], parameter=None)
+
+        func = Function(image="andreamora/imagerepo:vlcnoentrypointwithplugins",
+                        resources=Resource(memory=256, cpu=0.5).to_dict())
+
+        componentGUI = Component(name="video-gui", function=func.to_dict(),
+                                 boot_dependencies=["2"], nodes_blacklist=["node2"], nodes_whitelist=["node2"],
+                                 parameter=None)
         components.append(componentGUI.to_dict())
-        componentStream = Component(name="video-streamer", image="andreamora/imagerepo:vlcnoentrypointwithplugins",
-                                    priority="1", resources=Resource(memory=1024, cpu=2).to_dict(),
-                                    blacklist=["node2"], parameter=None)
+        componentStream = Component(name="video-streamer", function=func.to_dict(),
+                                    boot_dependencies=["2"], nodes_blacklist=["node2"], nodes_whitelist=["node2"],
+                                    parameter=path)
         components.append(componentStream.to_dict())
 
-        message = AdvMessage(ID=id, owner=owner, components=components,type=type)
-
+        message = AdvMessage(app_name=app_name, base_node=base_node, components=components, type=type)
         return message
     else:
         return "not implemented"

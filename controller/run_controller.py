@@ -4,6 +4,8 @@ from queue import Queue
 from threading import Thread
 from time import sleep
 
+import yaml
+
 from controller.Utils import vlc_yamlManager
 from controller.Utils.messaging.ClassForMessageADV.advertisement_message import AdvMessage
 from controller.Utils.messaging.ClassForMessageADV.type import Type
@@ -14,15 +16,6 @@ from controller.Utils.messaging.result_messaging import Messaging_result
 from controller.config.config import Configuration
 
 ADV_QUEUE = dict()
-
-# init queue
-shared_queue_res = Queue()
-shared_queue_adv = Queue()
-shared_queue_user_req = Queue()
-
-# init messaging
-messaging_result = Messaging_result("localhost", shared_queue_res)
-messaging_adv = Messaging_adv("localhost", shared_queue_adv, shared_queue_user_req)
 
 
 def test_produce(output_queue):
@@ -36,9 +29,15 @@ def dequeue_result(input_queue):
         result_message = input_queue.get(block=True, timeout=None)
 
         # do something with the result_message --> run your own components
-        print("-------> " + result_message.ID)
-        deployThread = Thread(target=deploy_components, args=(result_message,))
-        deployThread.start()
+        for component in result_message.components:
+            print("-------> component " + component['name'] + " app " + component['app_name'])
+
+            # run single component
+            deployThread = Thread(target=deploy_component, args=(component,))
+            deployThread.start()
+
+        # deployThread = Thread(target=deploy_components, args=(result_message,))
+        # deployThread.start()
 
         # indicate data has been consumed
         input_queue.task_done()
@@ -53,10 +52,14 @@ def dequeue_adv(input_queue):
         if adv_message.type == Type.DELETE:
             print("-------> delete: " + adv_message.app_name)
             # TODO: check if this node has component of this app, so deleted
+            try:
+                ADV_QUEUE.pop(adv_message.app_name)  # remove adv message
+            except KeyError:
+                print("Key not found")
 
         if adv_message.type == Type.ADD:
             print("-------> add: " + adv_message.app_name)
-            ADV_QUEUE[adv_message.app_name] = adv_message
+            ADV_QUEUE[adv_message.app_name] = adv_message  # add to adv dict
 
         # indicate data has been consumed
         input_queue.task_done()
@@ -88,9 +91,6 @@ def dequeue_user_request(input_queue):
 
 
 def run_controller():
-    # configuration
-    configuration = Configuration("config/config.ini")
-
     # thread that wait result
     t1 = Thread(target=dequeue_result, args=(shared_queue_res,))
     # thread that wait adv
@@ -118,12 +118,50 @@ def run_controller():
     # for test:
     message = AdvMessage()
     message.from_json(path.join(path.dirname(__file__), configuration.REQUEST))
-    messaging_adv.send_user_req(message)
+    messaging_adv.send_user_req(message, local=True)
 
-    # message_res = resultMessage()
-    # message_res.from_json(path.join(path.dirname(__file__), configuration.RESULT))
-    # messaging_result.send_result(message)
+    sleep(3)
 
+    message_res = resultMessage()
+    message_res.from_json(path.join(path.dirname(__file__), configuration.RESULT))
+    messaging_result.send_result(message_res, local=True)
+
+def deploy_component(component):
+    # search app_name in ADV_QUEUE for read info and parameters
+    adv_app = ADV_QUEUE[component['app_name']]
+    adv_app_component = None  # component with all information
+    for c in adv_app.components:
+        if c['name'] == component['name']:
+            adv_app_component = c
+            break
+
+    # from component name chose right yaml
+    # read parameters and function from adv_app_component for deploy
+    modified_default_yaml(adv_app_component)
+
+    print()
+
+# TODO: da fare meglio!!!
+def modified_default_yaml(adv_app_component):
+    # open default yaml document
+    with open(path.join(path.dirname(__file__),
+                        configuration.YAML_FOLDER + adv_app_component['name'] + ".yaml")) as f:
+        def_yaml = yaml.safe_load(f)
+
+    # edit fields
+    def_yaml['spec']['nodeName']=socket.gethostname()
+    def_yaml['spec']['containers'][0]['resources']['requests'] = adv_app_component['function']['resources']
+    def_yaml['spec']['containers'][0]['resources']['limits']=adv_app_component['function']['resources']
+    if adv_app_component['parameters'] is not None:
+        for param_type in adv_app_component['parameters']:
+            str=def_yaml['spec']['containers'][0]['args'][0].replace('{'+param_type+'}',adv_app_component['parameters'][param_type])
+            def_yaml['spec']['containers'][0]['args'][0]=str
+
+    print( def_yaml['spec']['containers'][0]['args'][0])
+
+    kubernetes = KubernetesClass()
+    kubernetes.create_generic(def_yaml)
+    print()
 
 def deploy_components(result_message=None):
     if result_message is not None:
@@ -191,4 +229,16 @@ def deploy_components(result_message=None):
 
 
 if __name__ == '__main__':
+    # configuration
+    configuration = Configuration("config/config.ini")
+
+    # init queue
+    shared_queue_res = Queue()
+    shared_queue_adv = Queue()
+    shared_queue_user_req = Queue()
+
+    # init messaging
+    messaging_result = Messaging_result("localhost", shared_queue_res)
+    messaging_adv = Messaging_adv("localhost", shared_queue_adv, shared_queue_user_req)
+
     run_controller()

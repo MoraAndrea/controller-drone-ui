@@ -1,17 +1,26 @@
 {
-  "ID": "VLC",
   "components": [
     {
       "name": "video-gui",
-      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
-      "winner": "dragon",
-      "priority": 2
+      "app_name": "VLC-AAAAAA",
+      "function": {
+        "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+        "resources": {
+          "memory": 256,
+          "cpu": 0.5
+        }
+      }
     },
     {
       "name": "video-streamer",
-      "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
-      "winner": "video-streamer",
-      "priority": 1
+      "app_name": "VLC-AAAAAA",
+      "function": {
+        "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+        "resources": {
+          "memory": 1024,
+          "cpu": 1
+        }
+      }
     }
   ]
 }

@@ -16,7 +16,7 @@ class Messaging_adv(object, metaclass=singleton.Singleton):
         self.output_queue = queueAdv  # queue for read adv message
         self.output_queue_user=queueUser    # queue for read user request
 
-    def register_handler_adv(self, connection_id, topic, handler, exchange_name,local=False):
+    def register_handler_adv(self, connection_id, topic, handler,local=False):
         if connection_id not in self._messaging._channels:
             print(connection_id + " not found")
 
@@ -27,7 +27,7 @@ class Messaging_adv(object, metaclass=singleton.Singleton):
 
         self._messaging._channels[connection_id].queue_declare(queue=topic)
         if exchange != '':
-            self._messaging._channels[connection_id].queue_bind(exchange=exchange_name, queue=topic)
+            self._messaging._channels[connection_id].queue_bind(exchange=exchange, queue=topic)
         if handler is None:
             handler = self._adv_message_handler
         self._message_handler = handler
@@ -74,12 +74,7 @@ class Messaging_adv(object, metaclass=singleton.Singleton):
         # connect
         connection_id = self._messaging.connect()
 
-        if local:
-            exchange = ''
-        else:
-            exchange = self.configuration.EXCHANGE
-
-        self._messaging.send_message(connection_id, self.configuration.QUEUE_ADV, message, exchange)
+        self._messaging.send_message(connection_id, self.configuration.QUEUE_ADV, message, local=False)
 
         self._messaging.disconnect(connection_id)
 
@@ -87,30 +82,24 @@ class Messaging_adv(object, metaclass=singleton.Singleton):
         # connect
         connection_id = self._messaging.connect()
 
-        if local:
-            exchange = ''
-        else:
-            exchange = self.configuration.EXCHANGE
-
-        self._messaging.send_message(connection_id, self.configuration.QUEUE_USER_REQ, message, '',local=True)
+        self._messaging.send_message(connection_id, self.configuration.QUEUE_USER_REQ, message, local=True) # local True means that not use federation
 
         self._messaging.disconnect(connection_id)
 
-    def consume_adv(self, handler_custom=None):
+    def consume_adv(self, handler_custom=None, local=False):
         # connect
         connection_id = self._messaging.connect()
 
-        self.register_handler_adv(connection_id, self.configuration.QUEUE_ADV, handler_custom,
-                                  self.configuration.EXCHANGE,local=False)
+        self.register_handler_adv(connection_id, self.configuration.QUEUE_ADV, handler_custom, local=False)
         # self.register_handler_adv(self.configuration.QUEUE_ADV, self._adv_message_handler, self.configuration.EXCHANGE)
         # start to handle messages
         self._messaging.start_consuming(connection_id)
 
-    def consume_user_req(self, handler_custom=None):
+    def consume_user_req(self, handler_custom=None, local=True):
         # connect
         connection_id = self._messaging.connect()
 
-        self.register_handler_adv(connection_id, self.configuration.QUEUE_USER_REQ, handler_custom,'',local=True)
+        self.register_handler_adv(connection_id, self.configuration.QUEUE_USER_REQ, handler_custom, local=True)
         # self.register_handler_adv(self.configuration.QUEUE_USER_REQ, self._adv_message_handler, '')
         # start to handle messages
         self._messaging.start_consuming(connection_id)

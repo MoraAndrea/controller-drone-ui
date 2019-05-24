@@ -2,18 +2,14 @@ import json
 import os
 import socket
 import uuid
-from os import path
 
 import psutil
 
-from controller.Utils import vlc_yamlManager
 from controller.Utils.messaging.ClassForMessageADV.advertisement_message import AdvMessage
 from controller.Utils.messaging.ClassForMessageADV.appComponent import Component
 from controller.Utils.messaging.ClassForMessageADV.componentFunction import Function
 from controller.Utils.messaging.ClassForMessageADV.componentResource import Resource
-from controller.Utils.messaging.CommunicationDockerKubernetes.KubernetesManagerClass import KubernetesClass
 from controller.Utils.messaging.adv_messaging import Messaging_adv
-from controller.config.config import Configuration
 
 APP_RUNNING=dict()
 
@@ -76,7 +72,7 @@ def send_delete_app(classLogger, fileRequest=None, app_id=None):
         message_del.type='del'
         messaging_adv.send_user_req(message_del, local=True) # send message to controller
         try:
-            APP_RUNNING.pop(message_del.app_name)  # remove app running
+            APP_RUNNING.pop(message_del.app_name)  # remove from app running
         except KeyError:
             print("Key not found")
         logger.submit_message('INFO', "Send request for delete application describe in file: " + fileRequest.name)
@@ -88,32 +84,6 @@ def send_delete_app(classLogger, fileRequest=None, app_id=None):
         except KeyError:
             print("Key not found")
         logger.submit_message('INFO', "Send request for delete application: " + app_del.app_name)
-
-
-def runKubeImpl_local(message):
-    configuration = Configuration("config/config.ini")
-    kubernetes = KubernetesClass()
-
-    # get hostname
-    node_name = socket.gethostname()
-    print(node_name + " " + socket.gethostbyname(node_name))
-
-    # check exist namespaces and create this
-    namespace = kubernetes.get_namespace(configuration.NAMESPACE)
-    if namespace == None or namespace.status.phase != "Active":
-        kubernetes.create_namespace(configuration.NAMESPACE)
-
-    # TODO: fare in modo che cambia il file video nello yaml leggendo in fileRequest
-
-    fileNameMod = vlc_yamlManager.modified_localVideo(
-        path.join(path.dirname(__file__), configuration.YAML_FOLDER + "video-gui-local-video.yaml"),
-        message.components[1]['parameter'])
-
-    # local run pod
-    # podNameVideoLocal = kubernetes.create_pod(path.join(path.dirname(__file__), configuration.YAML_FOLDER + "video-gui-local-video.yaml"),configuration.NAMESPACE)
-
-    podNameVideoLocal = kubernetes.create_pod(path.join(path.dirname(__file__), fileNameMod), configuration.NAMESPACE)
-    return podNameVideoLocal
 
 
 # check if this node can run all application

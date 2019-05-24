@@ -12,7 +12,7 @@
           "cpu": 0.5
         }
       },
-      "parameter": null,
+      "parameters": null,
       "boot_dependencies": [],
       "nodes_blacklist": [
         "node2"
@@ -26,11 +26,13 @@
       "function": {
         "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
         "resources": {
-          "memory": 1024,
-          "cpu": 2
+          "memory": "1024Mi",
+          "cpu": "1"
         }
       },
-      "parameter": null,
+      "parameters": {
+        "path": "/home/Video/videoNoSound.mp4"
+      },
       "boot_dependencies": [],
       "nodes_blacklist": [
         "node2"

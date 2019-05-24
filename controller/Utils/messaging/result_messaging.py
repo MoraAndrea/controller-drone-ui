@@ -16,7 +16,7 @@ class Messaging_result(object, metaclass=singleton.Singleton):
         self.configuration = Configuration("config/config.ini")
         self.output_queue = queue   # queue for read result message
 
-    def register_handler_result(self,connection_id, topic, handler, exchange_name,local=False):
+    def register_handler_result(self,connection_id, topic, handler, local=False):
         if connection_id not in self._messaging._channels:
             print(connection_id+" not found")
 
@@ -27,7 +27,7 @@ class Messaging_result(object, metaclass=singleton.Singleton):
 
         self._messaging._channels[connection_id].queue_declare(queue=topic)
         if exchange != '':
-            self._messaging._channels[connection_id].queue_bind(exchange=exchange_name, queue=topic)
+            self._messaging._channels[connection_id].queue_bind(exchange=exchange, queue=topic)
         if handler is None:
             handler = self._result_message_handler
         self._message_handler = handler
@@ -44,43 +44,35 @@ class Messaging_result(object, metaclass=singleton.Singleton):
 
     @staticmethod
     def _result_message_handler(message):
-        print("Received result for app " + message.ID)
+        for component in message.components:
+            print("Received result for component "+component['name']+" app " + component['app_name'])
 
     def _result_message_handler_enqueue(self,message):
-        print("Received result for app " + message.ID)
+        for component in message.components:
+            print("Received result for component "+component['name']+" app " + component['app_name'])
         self.output_queue.put(message)
 
-    def send_from_file_result(self, file,local=False):
+    def send_from_file_result(self, file, local=False):
         connection_id=self._messaging.connect()
-
-        if local:
-            exchange = ''
-        else:
-            exchange = self.configuration.EXCHANGE
 
         message = resultMessage()
         message.from_json(file)
 
-        self._messaging.send_message(connection_id,self.configuration.QUEUE_RESULT, message, exchange)
+        self._messaging.send_message(connection_id,self.configuration.QUEUE_RESULT, message, local=True)
 
         self._messaging.disconnect(connection_id)
 
-    def send_result(self, message,local=False):
+    def send_result(self, message, local=False):
         connection_id=self._messaging.connect()
 
-        if local:
-            exchange = ''
-        else:
-            exchange = self.configuration.EXCHANGE
-
-        self._messaging.send_message(connection_id,self.configuration.QUEUE_RESULT, message, exchange)
+        self._messaging.send_message(connection_id,self.configuration.QUEUE_RESULT, message, local=True)
 
         self._messaging.disconnect(connection_id)
 
     def consume_result(self, handler_custom=None):
         connection_id=self._messaging.connect()
 
-        self.register_handler_result(connection_id,self.configuration.QUEUE_RESULT, handler_custom, self.configuration.EXCHANGE)
+        self.register_handler_result(connection_id,self.configuration.QUEUE_RESULT, handler_custom, local=True)
         # self.register_handler_result(self.configuration.QUEUE_RESULT, self._result_message_handler,self.configuration.EXCHANGE)
 
         # start to handle messages

@@ -44,17 +44,19 @@ class Messaging(object, metaclass=singleton.Singleton):
         parameters = pika.ConnectionParameters(broker_host, 5672, '/', credentials)
         return pika.BlockingConnection(parameters)
 
-    def send_message(self, connection_id, dst, message, exchange_name, local=False):
+    def send_message(self, connection_id, dst, message, local=False):
         if connection_id not in self._channels:
             print(connection_id+" not found")
+
         if local:
-            exchange = ''
+            exchange = ''   # default exchange, for local message
         else:
-            exchange =self.configuration.EXCHANGE
+            exchange =self.configuration.EXCHANGE   # federate exchange
+
         self._channels[connection_id].queue_declare(queue=dst)
-        if exchange != '':
-            self._channels[connection_id].queue_bind(exchange=exchange_name, queue=dst)
-        self._channels[connection_id].basic_publish(exchange=exchange_name, routing_key=dst, body=json.dumps(message.to_dict()))
+        if exchange != '':  # bind only if exchange is federate
+            self._channels[connection_id].queue_bind(exchange=exchange, queue=dst)
+        self._channels[connection_id].basic_publish(exchange=exchange, routing_key=dst, body=json.dumps(message.to_dict()))
 
     def create_bind_queue(self,connection_id, name, exchange_name):
         self._channels[connection_id].queue_declare(queue=name)

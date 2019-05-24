@@ -1,3 +1,5 @@
+import re
+
 from kubernetes import client, config, stream
 from os import path
 import yaml
@@ -21,22 +23,69 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         except Exception as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
 
+    def create_deployment_object(self,name,image_container,container_port,name_deployment):
+        # Configureate Pod template container
+        container = client.V1Container(
+            name=name,
+            image=image_container,
+            ports=[client.V1ContainerPort(container_port=container_port)])
+        # Create and configurate a spec section
+        template = client.V1PodTemplateSpec(
+            metadata=client.V1ObjectMeta(labels={"run": name}),
+            spec=client.V1PodSpec(containers=[container]))
+        # Create and configurate a selection sector
+        selector = client.V1LabelSelector(match_labels={"run":name})
+        # Create the specification of deployment
+        spec = client.ExtensionsV1beta1DeploymentSpec(
+            template=template,
+            selector=selector)
+        # Instantiate the deployment object
+        deployment = client.ExtensionsV1beta1Deployment(
+            api_version="extensions/v1beta1",
+            kind="Deployment",
+            metadata=client.V1ObjectMeta(name=name_deployment),
+            spec=spec)
+
+        return deployment
+
+    def create_service_object(self,name):
+        k8s = client.CoreV1Api()
+
+        body = client.V1Service()  # V1Service
+        # Creating Meta Data
+        metadata = client.V1ObjectMeta()
+        metadata.name = name
+        metadata.labels={"run": name}
+        body.metadata = metadata
+
+        # Creating spec
+        spec = client.V1ServiceSpec()
+        # Creating Port object
+        port = client.V1ServicePort()
+        port.protocol = 'TCP'
+        port.port = 80
+
+        spec.ports = [port]
+        spec.selector = {"run": name}
+
+        body.spec = spec
+
     @staticmethod
     def create_pod(fileYaml, namespace):
         with open(path.join(path.dirname(__file__), fileYaml)) as f:
-            dep = yaml.safe_load(f)
+            pod = yaml.safe_load(f)
             k8s = client.CoreV1Api()
             try:
-                resp = k8s.create_namespaced_pod(body=dep, namespace=namespace)
+                resp = k8s.create_namespaced_pod(body=pod, namespace=namespace)
                 print("Pod created.\n status='%s'" % str(resp.status))
-                return dep['metadata']['name']
+                return pod['metadata']['name']
             except Exception as e:
                 print("Exception --> " + str(e.status) + " " + str(e.reason))
                 print('Failed to create Pod: ' + str(e))
                 return False
 
     @staticmethod
-    def create_deployment(fileYaml, namespace):
+    def create_deployment_from_file(fileYaml, namespace):
         with open(path.join(path.dirname(__file__), fileYaml)) as f:
             dep = yaml.safe_load(f)
             k8s = client.ExtensionsV1beta1Api()
@@ -48,12 +97,22 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
                 print('Failed to create Deployment: ' + str(e))
 
     @staticmethod
+    def create_deployment(yaml, namespace):
+        k8s = client.ExtensionsV1beta1Api()
+        try:
+            resp = k8s.create_namespaced_deployment(body=yaml, namespace=namespace)
+            print("Deployment created.\n status='%s'" % str(resp.status))
+        except Exception as e:
+            print("Exception --> " + str(e.status) + " " + str(e.reason))
+            print('Failed to create Deployment: ' + str(e))
+
+    @staticmethod
     def create_service(fileyaml, namespace):
         with open(path.join(path.dirname(__file__), fileyaml)) as f:
-            dep = yaml.safe_load(f)
+            service = yaml.safe_load(f)
             k8s = client.CoreV1Api()
             try:
-                resp = k8s.create_namespaced_service(body=dep, namespace=namespace)
+                resp = k8s.create_namespaced_service(body=service, namespace=namespace)
                 print("Service created.\n status='%s'" % str(resp.status))
             except Exception as e:
                 print("Exception --> " + str(e.status) + " " + str(e.reason))

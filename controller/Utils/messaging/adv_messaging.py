@@ -14,7 +14,7 @@ class Messaging_adv(object, metaclass=singleton.Singleton):
         self._message_handler = None
         self.configuration = Configuration("config/config.ini")
         self.output_queue = queueAdv  # queue for read adv message
-        self.output_queue_user=queueUser    # queue for read user request
+        self.output_queue_user= queueUser    # queue for read user request
 
     def register_handler_adv(self, connection_id, topic, handler,local=False):
         if connection_id not in self._messaging._channels:

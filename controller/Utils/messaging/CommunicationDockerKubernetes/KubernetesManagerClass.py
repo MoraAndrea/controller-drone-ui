@@ -61,17 +61,25 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         # Creating spec
         spec = client.V1ServiceSpec()
         # Creating Port object
-        port = client.V1ServicePort()
+        port = client.V1ServicePort(port=8080)
         port.protocol = 'TCP'
-        port.port = 80
 
         spec.ports = [port]
         spec.selector = {"run": name}
 
         body.spec = spec
+        return body
+
+    def create_generally(self, kind, yaml):
+        if kind == 'Pod':
+            return self.create_pod(yaml,"test")
+        if kind == 'Deployment':
+            return self.create_deployment(yaml,"test")
+        if kind == 'Service':
+            return self.create_service(yaml,"test")
 
     @staticmethod
-    def create_pod(fileYaml, namespace):
+    def create_pod_from_file(fileYaml, namespace):
         with open(path.join(path.dirname(__file__), fileYaml)) as f:
             pod = yaml.safe_load(f)
             k8s = client.CoreV1Api()
@@ -85,10 +93,33 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
                 return False
 
     @staticmethod
+    def create_pod(yaml, namespace):
+        k8s = client.CoreV1Api()
+        try:
+            resp = k8s.create_namespaced_pod(body=yaml, namespace=namespace)
+            print("Pod created.\n status='%s'" % str(resp.status))
+            return yaml['metadata']['name']
+        except Exception as e:
+            if e.status != 409:
+                return False
+            try:
+                print('Pod conflict: ' + str(e))
+                k8s.patch_namespaced_pod(name=yaml['metadata']['name'],body=yaml, namespace=namespace)
+            except Exception as e:
+                try:
+                    # second attempt... delete the existing object and re-insert
+                    resp = k8s.delete_namespaced_pod(name=yaml['metadata']['name'],namespace=namespace)
+                    resp = k8s.create_namespaced_pod(body=yaml, namespace=namespace)
+                except Exception as e:
+                    print("Exception --> " + str(e.status) + " " + str(e.reason))
+                    print('Failed to create Pod: ' + str(e))
+                    return False
+
+    @staticmethod
     def create_deployment_from_file(fileYaml, namespace):
         with open(path.join(path.dirname(__file__), fileYaml)) as f:
             dep = yaml.safe_load(f)
-            k8s = client.ExtensionsV1beta1Api()
+            k8s = client.AppsV1Api()
             try:
                 resp = k8s.create_namespaced_deployment(body=dep, namespace=namespace)
                 print("Deployment created.\n status='%s'" % str(resp.status))
@@ -98,7 +129,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
 
     @staticmethod
     def create_deployment(yaml, namespace):
-        k8s = client.ExtensionsV1beta1Api()
+        k8s = client.AppsV1Api()
         try:
             resp = k8s.create_namespaced_deployment(body=yaml, namespace=namespace)
             print("Deployment created.\n status='%s'" % str(resp.status))
@@ -107,7 +138,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             print('Failed to create Deployment: ' + str(e))
 
     @staticmethod
-    def create_service(fileyaml, namespace):
+    def create_service_from_file(fileyaml, namespace):
         with open(path.join(path.dirname(__file__), fileyaml)) as f:
             service = yaml.safe_load(f)
             k8s = client.CoreV1Api()
@@ -117,6 +148,16 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             except Exception as e:
                 print("Exception --> " + str(e.status) + " " + str(e.reason))
                 print('Failed to create Service: ' + str(e))
+
+    @staticmethod
+    def create_service(yaml, namespace):
+        k8s = client.CoreV1Api()
+        try:
+            resp = k8s.create_namespaced_service(body=yaml, namespace=namespace)
+            print("Service created.\n status='%s'" % str(resp.status))
+        except client.ExtensionsApi as e:
+            print("Exception --> " + str(e.status) + " " + str(e.reason))
+            print('Failed to create Service: ' + str(e))
 
     @staticmethod
     def delete_pod_in_yaml(fileYaml, namespace):

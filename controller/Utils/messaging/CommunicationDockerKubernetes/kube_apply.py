@@ -4,12 +4,10 @@ import yaml
 import logging
 
 import kubernetes.client
-
+from kubernetes import config
 
 
 def runUsageExample():
-    ''' demonstrate usage by creating a simple Pod through default client
-    '''
     logging.basicConfig(level=logging.DEBUG)
     #
 #   KUBECONFIG = '/path/to/special/kubecfg.yaml'
@@ -20,46 +18,44 @@ def runUsageExample():
 
 
     fromYaml('''
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
-  name: video-streamer
+  name: local-video-gui
 spec:
-  selector:
-    matchLabels:
-      run: video-streamer
-  template:
-    metadata:
-      labels:
-        run: video-streamer
-    spec:
-      nodeName: kworker2.dragon.com # schedule pod to specific node
-      containers:
-      - name: vlc-streamer
-        image: andreamora/imagerepo:vlcnoentrypoint
-        imagePullPolicy: IfNotPresent
-        volumeMounts:
-        - mountPath: /home/Video
-          name: storagevideo
-        command: ["/bin/sh","-c"]
-        #cvlc -I dummy -vvv /home/Video/videoNoSound.mp4 --sout '#transcode{vcodec=h264,vb=1500,fps=35,width=640,height=360,acodec=mp3,ab=192,channels=2,samplerate=44100,scodec=none}:http{mux=ffmpeg{mux=flv},dst=:8080/}' --no-sout-all --sout-keep
-        args: ["cvlc -vvv /home/Video/videoNoSound.mp4 --sout '#transcode{vcodec=h264,vb=1500,fps=35,width=640,height=360,acodec=mp3,ab=192,channels=2,samplerate=44100,scodec=none}:http{mux=ffmpeg{mux=flv},dst=:8080/}' --no-sout-all --sout-keep"] #["cvlc -I dummy -vvv /home/Video/video1080.mp4 --sout '#standard{access=http,dst=:8080}' --no-sout-all --sout-keep"]
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "1024Mi"
-            cpu: "1"
-        ports:
-        - containerPort: 8080
-      restartPolicy: Always # possible values Always, OnFailure, and Never. The default value is Always.
-      volumes:
-      - name: storagevideo
-        hostPath:
-          path: /home/vagrant/Desktop/Video   # directory location on host
+  nodeName: kworker1.dragon.com # schedule pod to specific node
+  containers:
+  - name: my-first-pod
+    image: andreamora/imagerepo:vlcnoentrypoint
+    env:
+    - name: DISPLAY
+      value: :0
+    stdin: true
+    tty: true
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - mountPath: /tmp/.X11-unix
+      name: video
+    - mountPath: /home/Video
+      name: storagevideo
+    command: ["/bin/sh","-c"]
+    args: ["vlc /home/Video/videoNoSound.mp4"]
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1024Mi"
+        cpu: "1"
+  restartPolicy: OnFailure
+  volumes:
+  - name: video
+    hostPath:
+      path: /tmp/.X11-unix    # directory location on host
+  - name: storagevideo
+    hostPath:
+      path: /home/vagrant/Desktop/Video
 ''')
-
 
 
 def fromYaml(rawData, client=None, **kwargs):
@@ -70,8 +66,9 @@ def fromYaml(rawData, client=None, **kwargs):
         @param kwargs: (optional) further arguments to pass to the create/replace call
         @return: response object from Kubernetes API call
     '''
-    for obj in yaml.load_all(rawData):
-        createOrUpdateOrReplace(obj, client, **kwargs)
+    config.load_kube_config()
+    obj =yaml.safe_load(rawData)
+    createOrUpdateOrReplace(obj, client, **kwargs)
 
 
 def createOrUpdateOrReplace(obj, client=None, **kwargs):
@@ -86,6 +83,7 @@ def createOrUpdateOrReplace(obj, client=None, **kwargs):
         @return: response object from Kubernetes API call
     '''
     k8sApi = findK8sApi(obj, client)
+
     try:
         res = invokeApi(k8sApi, 'create', obj, **kwargs)
         logging.debug('K8s: %s created -> uid=%s', describe(obj), res.metadata.uid)

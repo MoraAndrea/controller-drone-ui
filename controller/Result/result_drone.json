@@ -1,7 +1,7 @@
 {
   "components": [
     {
-      "name": "video-gui",
+      "name": "video-gui-deployment",
       "app_name": "VLC-AAAAAA",
       "function": {
         "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
@@ -12,7 +12,7 @@
       }
     },
     {
-      "name": "video-streamer",
+      "name": "video-streamer-deployment",
       "app_name": "VLC-AAAAAA",
       "function": {
         "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",

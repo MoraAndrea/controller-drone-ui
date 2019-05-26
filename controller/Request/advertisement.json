@@ -4,16 +4,18 @@
   "type": "add",
   "components": [
     {
-      "name": "video-gui",
+      "name": "video-gui-deployment",
       "function": {
         "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
         "resources": {
-          "memory": 256,
-          "cpu": 0.5
+          "memory": "256Mi",
+          "cpu": "500m"
         }
       },
-      "parameters": null,
-      "boot_dependencies": [],
+      "parameters": {
+        "ip": ""
+      },
+      "boot_dependencies": ["video-streamer"],
       "nodes_blacklist": [
         "node2"
       ],
@@ -22,7 +24,7 @@
       ]
     },
     {
-      "name": "video-streamer",
+      "name": "video-streamer-deployment",
       "function": {
         "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
         "resources": {
@@ -31,7 +33,8 @@
         }
       },
       "parameters": {
-        "path": "/home/Video/videoNoSound.mp4"
+        "path": "/home/Video/videoNoSound.mp4",
+        "service": true
       },
       "boot_dependencies": [],
       "nodes_blacklist": [

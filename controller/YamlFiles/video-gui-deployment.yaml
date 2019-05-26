@@ -19,7 +19,7 @@ spec:
     - mountPath: /home/Video
       name: storagevideo
     command: ["/bin/sh","-c"]
-    args: ["vlc -V x11 http://video-streamer:8080 --no-qt-privacy-ask --no-metadata-network-access --snapshot-path=/home/vlc/snapshots --network-caching=1000"]
+    args: ["vlc -V x11 http://video-streamer.test:8080 --no-qt-privacy-ask --no-metadata-network-access --snapshot-path=/home/vlc/snapshots --network-caching=1000"]
     resources:
       requests:
         memory: "256Mi"

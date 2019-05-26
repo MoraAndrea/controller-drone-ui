@@ -13,8 +13,8 @@ from controller.Utils.messaging.adv_messaging import Messaging_adv
 from controller.Utils.messaging.result_messaging import Messaging_result
 from controller.config.config import Configuration
 
-ADV_QUEUE = dict()
-
+ADV_QUEUE = dict()              # contains all app adv, [app_name: adv]
+COMPONENT_RUN_HERE = dict()     # contains component running in this node, [app_name: component]
 
 def test_produce():
 
@@ -42,10 +42,11 @@ def dequeue_result(input_queue):
             # for each component run deploy
             deployThread = Thread(target=deploy_component1, args=(component,))
             deployThread.start()
-
+            if component['app_name'] not in COMPONENT_RUN_HERE:
+                COMPONENT_RUN_HERE[component['app_name']]= []
+            COMPONENT_RUN_HERE[component['app_name']].append(component)
         # indicate data has been consumed
         input_queue.task_done()
-
 
 def dequeue_adv(input_queue):
     while True:
@@ -56,6 +57,12 @@ def dequeue_adv(input_queue):
         if adv_message.type == Type.DELETE:
             print("-------> delete: " + adv_message.app_name)
             # TODO: check if this node has component of this app, so deleted
+            if adv_message.app_name in COMPONENT_RUN_HERE:
+                for component in COMPONENT_RUN_HERE[adv_message.app_name]:
+                    # for each component run delete function
+                    deleteThread = Thread(target=delete_component, args=(component,))
+                    deleteThread.start()
+
             try:
                 ADV_QUEUE.pop(adv_message.app_name)  # remove adv message
             except KeyError:
@@ -224,6 +231,31 @@ def modified_default_yaml_deployment(adv_app_component):
                 '{' + param_type + '}', str(adv_app_component['parameters'][param_type]))
 
     return def_yaml
+
+
+def delete_component(component):
+    kubernetes = KubernetesClass()
+
+    # search app_name in ADV_QUEUE for read info and parameters
+    adv_app = ADV_QUEUE[component['app_name']]
+    adv_app_component = None  # component with all information
+    for c in adv_app.components:
+        if c['name'] == component['name']:
+            adv_app_component = c
+            break
+
+    name_yaml = adv_app_component['name']
+    print(name_yaml)
+    # open default yaml document
+    with open(configuration.YAML_FOLDER + name_yaml + ".yaml") as f:
+        obj_yaml = yaml.safe_load(f)
+
+    if 'service' in adv_app_component['parameters']:
+        service = kubernetes.create_service_object(obj_yaml['metadata']['name'])
+        kubernetes.delete_generally('Service',service.metadata.name)
+
+    kubernetes.delete_generally(obj_yaml['kind'],obj_yaml['metadata']['name'])
+
 
 if __name__ == '__main__':
     # configuration

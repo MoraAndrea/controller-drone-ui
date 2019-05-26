@@ -159,6 +159,14 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             print("Exception --> " + str(e.status) + " " + str(e.reason))
             print('Failed to create Service: ' + str(e))
 
+    def delete_generally(self, kind, name):
+        if kind == 'Pod':
+            return self.delete_pod(name,"test")
+        if kind == 'Deployment':
+            return self.delete_deployment(name,"test")
+        if kind == 'Service':
+            return self.delete_service(name,"test")
+
     @staticmethod
     def delete_pod_in_yaml(fileYaml, namespace):
         with open(path.join(path.dirname(__file__), fileYaml)) as f:
@@ -202,7 +210,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             return False
 
     @staticmethod
-    def delete_deployment(fileYaml, namespace):
+    def delete_deployment_in_yaml(fileYaml, namespace):
         with open(path.join(path.dirname(__file__), fileYaml)) as f:
             dep = yaml.safe_load(f)
 
@@ -215,6 +223,28 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             except Exception as e:
                 print("Exception --> " + str(e.status) + " " + str(e.reason))
                 print('Failed to delete Deployment: ' + str(e))
+
+    @staticmethod
+    def delete_deployment(name, namespace):
+        k8s = client.ExtensionsV1beta1Api()
+        try:
+            resp = k8s.delete_namespaced_deployment(name=name, namespace=namespace,
+                                                        body=client.V1DeleteOptions(propagation_policy="Foreground",
+                                                                                    grace_period_seconds=5))
+            print("Deployment delete. status='%s'" % str(resp.status))
+        except Exception as e:
+            print("Exception --> " + str(e.status) + " " + str(e.reason))
+            print('Failed to delete Deployment: ' + str(e))
+
+    @staticmethod
+    def delete_service(name, namespace):
+        k8s = client.CoreV1Api()
+        try:
+            resp = k8s.delete_namespaced_service(name=name, namespace=namespace)
+            print("Service deleted.\n status='%s'" % str(resp.status))
+        except client.ExtensionsApi as e:
+            print("Exception --> " + str(e.status) + " " + str(e.reason))
+            print('Failed to create Service: ' + str(e))
 
     @staticmethod
     def list_pods():

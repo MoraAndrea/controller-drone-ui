@@ -115,7 +115,7 @@ def runKubeImpl_local(message):
     # check exist namespaces and create this
     namespace = kubernetes.get_namespace(configuration.NAMESPACE)
     if namespace == None or namespace.status.phase != "Active":
-        kubernetes.create_namespace(configuration.NAMESPACE)
+        kubernetes.create_namespace_if_not_exist(configuration.NAMESPACE)
 
     # TODO: fare in modo che cambia il file video nello yaml leggendo in fileRequest
 
@@ -140,7 +140,7 @@ def runKubeImpl_distribuitedPods(message):
     # check exist namespaces and create this
     namespace = kubernetes.get_namespace(configuration.NAMESPACE)
     if namespace == None or namespace.status.phase != "Active":
-        kubernetes.create_namespace(configuration.NAMESPACE)
+        kubernetes.create_namespace_if_not_exist(configuration.NAMESPACE)
 
     # TODO: fare in modo che cambia il file video nello yaml leggendo in fileRequest
 
@@ -243,7 +243,7 @@ def runKubeExample():
     # check exist namespaces and create this
     namespace = kubernetes.get_namespace(configuration.NAMESPACE)
     if namespace == None or namespace.status.phase != "Active":
-        kubernetes.create_namespace(configuration.NAMESPACE)
+        kubernetes.create_namespace_if_not_exist(configuration.NAMESPACE)
 
     base_folder = os.path.realpath(os.path.abspath(os.path.split(inspect.getfile(inspect.currentframe()))[0])) \
         .rpartition('/')[0]

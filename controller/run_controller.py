@@ -30,6 +30,7 @@ def test_produce():
     messaging_result.send_result(message_res, local=True)
 
 
+
 def dequeue_result(input_queue):
     while True:
         # retrieve data (blocking)
@@ -40,7 +41,7 @@ def dequeue_result(input_queue):
             print("-------> component " + component['name'] + " app " + component['app_name'])
 
             # for each component run deploy
-            deployThread = Thread(target=deploy_component1, args=(component,))
+            deployThread = Thread(target=deploy_component_deployment, args=(component,))
             deployThread.start()
             if component['app_name'] not in COMPONENT_RUN_HERE:
                 COMPONENT_RUN_HERE[component['app_name']]= []
@@ -60,7 +61,7 @@ def dequeue_adv(input_queue):
             if adv_message.app_name in COMPONENT_RUN_HERE:
                 for component in COMPONENT_RUN_HERE[adv_message.app_name]:
                     # for each component run delete function
-                    deleteThread = Thread(target=delete_component, args=(component,))
+                    deleteThread = Thread(target=delete_component, args=(component,ADV_QUEUE[component['app_name']]))
                     deleteThread.start()
 
             try:
@@ -74,7 +75,6 @@ def dequeue_adv(input_queue):
 
         # indicate data has been consumed
         input_queue.task_done()
-
 
 def dequeue_user_request(input_queue):
     # this function was made because the user request can be different from the adv_message
@@ -100,8 +100,11 @@ def dequeue_user_request(input_queue):
         # indicate data has been consumed
         input_queue.task_done()
 
-
 def run_controller():
+
+    # create namespace
+    kubernetes.create_namespace_if_not_exist(configuration.NAMESPACE)
+
     # thread that wait result
     t1 = Thread(target=dequeue_result, args=(shared_queue_res,))
     # thread that wait adv
@@ -128,8 +131,7 @@ def run_controller():
 
     test_produce()
 
-
-def deploy_component1(component):
+def deploy_component_deployment(component):
     kubernetes = KubernetesClass()
 
     # search app_name in ADV_QUEUE for read info and parameters
@@ -146,15 +148,19 @@ def deploy_component1(component):
     with open(configuration.YAML_FOLDER + name_yaml + ".yaml") as f:
         obj_yaml = yaml.safe_load(f)
 
+    # check if param service is present, if is present this component required a service
     if 'service' in adv_app_component['parameters']:
-        service=kubernetes.create_service_object(obj_yaml['metadata']['name'])
-        kubernetes.create_generally('Service', service)
+        if adv_app_component['parameters']['service'] is True:
+            service=kubernetes.create_simple_service_object(obj_yaml['metadata']['name'])
+            kubernetes.create_generally('Service', service)     # deploy a service for current deployment
 
+    # check if kind of deploy is Pod or Deployment
     if obj_yaml['kind'] == "Pod":
         yaml_new = modified_default_yaml_pod(adv_app_component)
     else:
         yaml_new = modified_default_yaml_deployment(adv_app_component)
 
+    # deploy component
     kubernetes.create_generally(obj_yaml['kind'],yaml_new)
 
 def deploy_component(component):
@@ -191,6 +197,30 @@ def deploy_component(component):
 
     pod_info = kubernetes.create_pod(yaml, configuration.NAMESPACE)
 
+def delete_component(component,adv_app):
+    kubernetes = KubernetesClass()
+
+    adv_app_component = None  # component with all information
+    for c in adv_app.components:
+        if c['name'] == component['name']:
+            adv_app_component = c
+            break
+
+    name_yaml = adv_app_component['name']
+    print(name_yaml)
+    # open default yaml document
+    with open(configuration.YAML_FOLDER + name_yaml + ".yaml") as f:
+        obj_yaml = yaml.safe_load(f)
+
+    # check if param service is present
+    if 'service' in adv_app_component['parameters']:
+        if adv_app_component['parameters']['service'] is True:
+            service = kubernetes.create_simple_service_object(obj_yaml['metadata']['name'])
+            kubernetes.delete_generally('Service',service.metadata.name)    # delete associated service
+
+    # delete component
+    kubernetes.delete_generally(obj_yaml['kind'],obj_yaml['metadata']['name'])
+
 # TODO: da fare meglio!!!
 def modified_default_yaml_pod(adv_app_component):
     name_yaml=adv_app_component['name']
@@ -201,6 +231,7 @@ def modified_default_yaml_pod(adv_app_component):
 
     # edit fields
     # def_yaml['spec']['nodeName']=socket.gethostname()
+    def_yaml['spec']['containers'][0]['image'] = adv_app_component['function']['image']
     def_yaml['spec']['containers'][0]['resources']['requests'] = adv_app_component['function']['resources']
     def_yaml['spec']['containers'][0]['resources']['limits'] = adv_app_component['function']['resources']
     if adv_app_component['parameters'] is not None:
@@ -220,6 +251,7 @@ def modified_default_yaml_deployment(adv_app_component):
 
     # edit fields
     # def_yaml['spec']['nodeName']=socket.gethostname()
+    def_yaml['spec']['template']['spec']['containers'][0]['image'] = adv_app_component['function']['image']
     def_yaml['spec']['template']['spec']['containers'][0]['resources']['requests'] = adv_app_component['function'][
         'resources']
     def_yaml['spec']['template']['spec']['containers'][0]['resources']['limits'] = adv_app_component['function'][
@@ -233,33 +265,11 @@ def modified_default_yaml_deployment(adv_app_component):
     return def_yaml
 
 
-def delete_component(component):
-    kubernetes = KubernetesClass()
-
-    # search app_name in ADV_QUEUE for read info and parameters
-    adv_app = ADV_QUEUE[component['app_name']]
-    adv_app_component = None  # component with all information
-    for c in adv_app.components:
-        if c['name'] == component['name']:
-            adv_app_component = c
-            break
-
-    name_yaml = adv_app_component['name']
-    print(name_yaml)
-    # open default yaml document
-    with open(configuration.YAML_FOLDER + name_yaml + ".yaml") as f:
-        obj_yaml = yaml.safe_load(f)
-
-    if 'service' in adv_app_component['parameters']:
-        service = kubernetes.create_service_object(obj_yaml['metadata']['name'])
-        kubernetes.delete_generally('Service',service.metadata.name)
-
-    kubernetes.delete_generally(obj_yaml['kind'],obj_yaml['metadata']['name'])
-
-
 if __name__ == '__main__':
     # configuration
     configuration = Configuration("config/config.ini")
+
+    kubernetes = KubernetesClass()
 
     # init queue
     shared_queue_res = Queue()
@@ -271,3 +281,7 @@ if __name__ == '__main__':
     messaging_adv = Messaging_adv("localhost", shared_queue_adv, shared_queue_user_req)
 
     run_controller()
+
+    shared_queue_res.join()
+    shared_queue_adv.join()
+    shared_queue_user_req.join()

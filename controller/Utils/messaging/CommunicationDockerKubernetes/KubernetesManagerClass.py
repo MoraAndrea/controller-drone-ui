@@ -1,9 +1,10 @@
-import re
+import logging
 
 from kubernetes import client, config, stream
 from os import path
 import yaml
 
+from config.config import Configuration
 from controller.Utils import singleton
 
 
@@ -12,14 +13,20 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
     This class manage kubernetes communication
     """
 
+    logging.basicConfig(level=logging.ERROR)
+
     def __init__(self):
         config.load_kube_config()
+        self.configuration = Configuration("config/config.ini")
 
     @staticmethod
-    def create_namespace(namespace):
+    def create_namespace_if_not_exist(namespace):
         k8s = client.CoreV1Api()
         try:
-            k8s.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace)))
+            # check exist namespaces and create this
+            namespace = KubernetesClass.get_namespace(namespace)
+            if namespace == None or namespace.status.phase != "Active":
+                k8s.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace)))
         except Exception as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
 
@@ -41,14 +48,14 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             selector=selector)
         # Instantiate the deployment object
         deployment = client.ExtensionsV1beta1Deployment(
-            api_version="extensions/v1beta1",
+            api_version="apps/v1",
             kind="Deployment",
             metadata=client.V1ObjectMeta(name=name_deployment),
             spec=spec)
 
         return deployment
 
-    def create_service_object(self,name):
+    def create_simple_service_object(self, name):
         k8s = client.CoreV1Api()
 
         body = client.V1Service()  # V1Service
@@ -61,8 +68,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         # Creating spec
         spec = client.V1ServiceSpec()
         # Creating Port object
-        port = client.V1ServicePort(port=8080)
-        port.protocol = 'TCP'
+        port = client.V1ServicePort(protocol='TCP', port=8080)
 
         spec.ports = [port]
         spec.selector = {"run": name}
@@ -72,11 +78,11 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
 
     def create_generally(self, kind, yaml):
         if kind == 'Pod':
-            return self.create_pod(yaml,"test")
+            return self.create_pod(yaml, self.configuration.NAMESPACE)
         if kind == 'Deployment':
-            return self.create_deployment(yaml,"test")
+            return self.create_deployment(yaml, self.configuration.NAMESPACE)
         if kind == 'Service':
-            return self.create_service(yaml,"test")
+            return self.create_service(yaml, self.configuration.NAMESPACE)
 
     @staticmethod
     def create_pod_from_file(fileYaml, namespace):
@@ -96,24 +102,34 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
     def create_pod(yaml, namespace):
         k8s = client.CoreV1Api()
         try:
-            resp = k8s.create_namespaced_pod(body=yaml, namespace=namespace)
+            resp = k8s.create_namespaced_pod(body=yaml, namespace=namespace, pretty=True)
             print("Pod created.\n status='%s'" % str(resp.status))
             return yaml['metadata']['name']
         except Exception as e:
-            if e.status != 409:
+            if e.status != 409: # !conflict
+                print('Failed to create Pod: ' + str(e.status) + " " + str(e.reason))
                 return False
             try:
                 print('Pod conflict: ' + str(e))
                 k8s.patch_namespaced_pod(name=yaml['metadata']['name'],body=yaml, namespace=namespace)
             except Exception as e:
+                if e.status != 422 :
+                    print('Failed to create Pod: ' + str(e.status) + " " + str(e.reason))
+                    return False   # Unprocessable Entity
                 try:
                     # second attempt... delete the existing object and re-insert
                     resp = k8s.delete_namespaced_pod(name=yaml['metadata']['name'],namespace=namespace)
+                    logging.debug('K8s: %s DELETED...', KubernetesClass.describe(yaml))
                     resp = k8s.create_namespaced_pod(body=yaml, namespace=namespace)
+                    logging.debug('K8s: %s CREATED...', KubernetesClass.describe(yaml))
                 except Exception as e:
                     print("Exception --> " + str(e.status) + " " + str(e.reason))
                     print('Failed to create Pod: ' + str(e))
+                    message = 'K8s: FAILURE updating %s.' % (KubernetesClass.describe(yaml))
+                    logging.error(message)
+                    # raise RuntimeError(message)
                     return False
+
 
     @staticmethod
     def create_deployment_from_file(fileYaml, namespace):
@@ -134,8 +150,27 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             resp = k8s.create_namespaced_deployment(body=yaml, namespace=namespace)
             print("Deployment created.\n status='%s'" % str(resp.status))
         except Exception as e:
-            print("Exception --> " + str(e.status) + " " + str(e.reason))
-            print('Failed to create Deployment: ' + str(e))
+            if e.status != 409:  # !conflict
+                print('Failed to create Deployment: ' + str(e.status) + " " + str(e.reason))
+            try:
+                print('Deploy conflict: ' + str(e))
+                k8s.create_namespaced_deployment(name=yaml['metadata']['name'], body=yaml, namespace=namespace)
+            except Exception as e:
+                if e.status != 422 :
+                    print('Failed to create Deployment: ' + str(e.status) + " " + str(e.reason))  # Unprocessable Entity
+                try:
+                    # second attempt... delete the existing object and re-insert
+                    resp = k8s.delete_namespaced_deployment(name=yaml['metadata']['name'],namespace=namespace)
+                    logging.debug('K8s: %s DELETED...', KubernetesClass.describe(yaml))
+                    resp = k8s.create_namespaced_deployment(body=yaml, namespace=namespace)
+                    logging.debug('K8s: %s CREATED...', KubernetesClass.describe(yaml))
+                except Exception as e:
+                    print("Exception --> " + str(e.status) + " " + str(e.reason))
+                    print('Failed to create Deployment: ' + str(e))
+                    message = 'K8s: FAILURE updating %s.' % (KubernetesClass.describe(yaml))
+                    logging.error(message)
+                    # raise RuntimeError(message)
+                    return False
 
     @staticmethod
     def create_service_from_file(fileyaml, namespace):
@@ -155,7 +190,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         try:
             resp = k8s.create_namespaced_service(body=yaml, namespace=namespace)
             print("Service created.\n status='%s'" % str(resp.status))
-        except client.ExtensionsApi as e:
+        except Exception as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
             print('Failed to create Service: ' + str(e))
 
@@ -189,7 +224,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         try:
             for podName in namesOfpods:
                 resp = k8s.delete_namespaced_pod(name=podName, namespace=namespace)
-                print("Pod with name " + podName + " deleted. status='%s'" % str(resp.status))
+                print("Pod with name " + podName + " deleting. status='%s'" % str(resp.status))
             return True
         except Exception as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
@@ -202,7 +237,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         k8s.list_node()
         try:
             resp = k8s.delete_namespaced_pod(name=name, namespace=namespace)
-            print("Pod with name " + name + " deleted. status='%s'" % str(resp.status))
+            print("Pod with name " + name + " deleting. status='%s'" % str(resp.status))
             return True
         except Exception as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
@@ -231,7 +266,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
             resp = k8s.delete_namespaced_deployment(name=name, namespace=namespace,
                                                         body=client.V1DeleteOptions(propagation_policy="Foreground",
                                                                                     grace_period_seconds=5))
-            print("Deployment delete. status='%s'" % str(resp.status))
+            print("Deployment deleting. status='%s'" % str(resp.status))
         except Exception as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
             print('Failed to delete Deployment: ' + str(e))
@@ -241,7 +276,7 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         k8s = client.CoreV1Api()
         try:
             resp = k8s.delete_namespaced_service(name=name, namespace=namespace)
-            print("Service deleted.\n status='%s'" % str(resp.status))
+            print("Service deleting.\n status='%s'" % str(resp.status))
         except client.ExtensionsApi as e:
             print("Exception --> " + str(e.status) + " " + str(e.reason))
             print('Failed to create Service: ' + str(e))
@@ -350,10 +385,13 @@ class KubernetesClass(object, metaclass=singleton.Singleton):
         v1 = client.CoreV1Api()
         try:
             namespace_info = v1.read_namespace(name=nodename)
-            # print(api_response)
             return namespace_info
         except Exception as e:
             print("Exception when calling CoreV1Api->read_namespace: %s\n" % e)
+
+    @staticmethod
+    def describe(obj):
+        return "%s '%s'" % (obj['kind'], obj['metadata']['name'])
 
     @staticmethod
     def exec_on_pod(podName, namespace, command):

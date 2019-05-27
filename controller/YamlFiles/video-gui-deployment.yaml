@@ -10,14 +10,24 @@ spec:
     env:
     - name: DISPLAY
       value: :0
+    - name: PULSE_SERVER
+      value: unix:/run/user/1000/pulse/native
     stdin: true
     tty: true
     imagePullPolicy: IfNotPresent
     volumeMounts:
     - mountPath: /tmp/.X11-unix
       name: video
+    - mountPath: /dev/snd
+      name: sound
+    - mountPath: /dev/shm
+      name: tempsystem
+    - mountPath: /var/run/dbus
+      name: systembus
     - mountPath: /home/Video
       name: storagevideo
+    - mountPath: /run/user/1000/pulse/native
+      name: soundenv
     command: ["/bin/sh","-c"]
     args: ["vlc -V x11 http://video-streamer.test:8080 --no-qt-privacy-ask --no-metadata-network-access --snapshot-path=/home/vlc/snapshots --network-caching=1000"]
     resources:
@@ -32,6 +42,18 @@ spec:
   - name: video
     hostPath:
       path: /tmp/.X11-unix    # directory location on host
+  - name: sound
+    hostPath:
+      path: /dev/snd
+  - name: tempsystem
+    hostPath:
+      path: /dev/shm
+  - name: systembus
+    hostPath:
+      path: /var/run/dbus
   - name: storagevideo
     hostPath:
       path: /home/vagrant/Desktop/Video
+  - name: soundenv
+    hostPath:
+      path: /run/user/1000/pulse/native

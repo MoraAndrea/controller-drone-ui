@@ -6,7 +6,7 @@
     {
       "name": "video-gui-deployment",
       "function": {
-        "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+        "image": "andreamora/vlc:latest",
         "resources": {
           "memory": "256Mi",
           "cpu": "500m"
@@ -26,14 +26,14 @@
     {
       "name": "video-streamer-deployment",
       "function": {
-        "image": "andreamora/imagerepo:vlcnoentrypointwithplugins",
+        "image": "andreamora/vlc:latest",
         "resources": {
           "memory": "1024Mi",
           "cpu": "1"
         }
       },
       "parameters": {
-        "path": "/home/Video/videoNoSound.mp4",
+        "path": "/home/Video/video1080.mp4",
         "service": true
       },
       "boot_dependencies": [],

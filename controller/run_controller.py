@@ -269,6 +269,7 @@ if __name__ == '__main__':
     # configuration
     configuration = Configuration("config/config.ini")
 
+    # kubernetes class
     kubernetes = KubernetesClass()
 
     # init queue
@@ -280,8 +281,10 @@ if __name__ == '__main__':
     messaging_result = Messaging_result("localhost", shared_queue_res)
     messaging_adv = Messaging_adv("localhost", shared_queue_adv, shared_queue_user_req)
 
+    # run controller drone
     run_controller()
 
+    # wait that all queue are empty
     shared_queue_res.join()
     shared_queue_adv.join()
     shared_queue_user_req.join()

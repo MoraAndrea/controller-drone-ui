@@ -42,7 +42,6 @@ USER ${USER}
 # SELECTION STORAGE
 WORKDIR ${HOME}
 
-# NETTOYAGE
 RUN sudo apt-get --purge autoremove -y && \
     sudo apt-get autoclean -y && \
     sudo rm /etc/apt/sources.list && \
